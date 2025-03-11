@@ -25,4 +25,5 @@ This project is a Flask-based chatbot that integrates with an SQL Server databas
 - Python 3.8+
 - SQL Server with appropriate credentials
 - Groq API key
+  Refer Following Link TO Get Free Groq Key [Gorq_Key](https://console.groq.com/playground)
 
