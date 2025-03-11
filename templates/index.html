@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Chat Assistant</title>
+      <style>
+         body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #aae4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+         }
+         .container {
+            width: 100%;
+            max-width: 900px;
+            height: 90%;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+         }
+         .chatbox {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #d1f0eb;
+         }
+         .message-container {
+            display: flex;
+            margin: 10px 0;
+         }
+         .message-container.user {
+            justify-content: flex-end;
+         }
+         .message-container.assistant {
+            justify-content: flex-start;
+         }
+         .message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            line-height: 1.4;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+         }
+         .message.large-response {
+            background-color: #1a50e6;
+            color: white;
+            font-weight: bold;
+            padding: 15px;
+            max-height: none;
+         }
+         .message.user {
+            background-color: #007bff;
+            color: white;
+         }
+         .message.assistant {
+            background-color: #3f8450;
+            color: white;
+         }
+         .input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+            background: #fff;
+         }
+         .input-container input {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            font-size: 14px;
+            outline: none;
+         }
+         .input-container button {
+            padding: 15px 20px;
+            margin-left: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+         }
+         .input-container button:hover {
+            background-color: #0056b3;
+         }
+            table {
+               width: 100%;
+               border-collapse: collapse;
+               margin: 10px 0;
+               font-size: 14px;
+            }
+            table th, table td {
+               border: 1px solid #ddd;
+               padding: 8px;
+               text-align: left;
+            }
+            table th {
+               background-color: #007bff;
+               color: white;
+            }
+            .table-container {
+               max-height: 300px;
+               overflow-y: auto;
+               overflow-x: auto;
+               border: 1px solid #ddd;
+            }
+      </style>
+   </head>
+   <body>
+      <div class="container">
+         <h1 style="text-align: center; margin: 10px 0; font-size: 20px;">SQL Chat Assistant</h1>
+         <div class="chatbox" id="chatbox"></div>
+         <div class="input-container">
+            <input type="text" id="question" placeholder="Ask a question...">
+            <button onclick="askQuestion()">Ask</button>
+         </div>
+      </div>
+      <div id="loading-spinner" style="display: none; text-align: center;">
+         <p>Loading...</p>
+      </div>
+      <script>
+         function appendMessage(response, userType, isTable = false) {
+            const chatbox = document.getElementById('chatbox');
+            const messageContainer = document.createElement('div');
+            const messageDiv = document.createElement('div');
+         
+            messageContainer.className = `message-container ${userType}`;
+            messageDiv.className = `message ${userType} ${isTable ? 'large-response' : ''}`;
+         
+            if (isTable) {
+               const tableContainer = document.createElement('div');
+               tableContainer.className = 'table-container';
+         
+               const table = document.createElement('table');
+               const headers = Object.keys(response[0]);
+               const thead = document.createElement('thead');
+               const headerRow = document.createElement('tr');
+               headers.forEach(header => {
+                  const th = document.createElement('th');
+                  th.textContent = header;
+                  headerRow.appendChild(th);
+               });
+               thead.appendChild(headerRow);
+               table.appendChild(thead);
+         
+               const tbody = document.createElement('tbody');
+               response.forEach(row => {
+                  const tr = document.createElement('tr');
+                  Object.values(row).forEach(value => {
+                     const td = document.createElement('td');
+                     td.textContent = value;
+                     tr.appendChild(td);
+                  });
+                  tbody.appendChild(tr);
+               });
+               table.appendChild(tbody);
+         
+               tableContainer.appendChild(table);
+               messageDiv.appendChild(tableContainer);
+            } else {
+               messageDiv.textContent = response;
+            }
+         
+            messageContainer.appendChild(messageDiv);
+            chatbox.appendChild(messageContainer);
+            chatbox.scrollTop = chatbox.scrollHeight;
+         }
+         
+         function askQuestion() {
+            const question = document.getElementById('question').value;
+            if (!question) return;
+         
+            appendMessage(question, 'user');
+            document.getElementById('question').value = '';
+            document.getElementById('loading-spinner').style.display = 'block';
+         
+            fetch('/ask', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ question })
+            })
+               .then(response => response.json())
+               .then(data => {
+                  document.getElementById('loading-spinner').style.display = 'none';
+                  if (data.isTable) {
+                     renderTableResponse(data.response, data.downloadUrl);
+                  } else {
+                     appendMessage(data.response, 'assistant');
+                  }
+               })
+               .catch(error => {
+                  console.error("Error in fetch:", error);
+                  document.getElementById('loading-spinner').style.display = 'none';
+                  appendMessage('Error: Unable to process your request.', 'assistant');
+               });
+         }
+         
+         function renderTableResponse(tableData, downloadUrl) {
+            const chatbox = document.getElementById('chatbox');
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container assistant';
+         
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'table-container';
+         
+            const table = document.createElement('table');
+            const headers = Object.keys(tableData[0]);
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+               const th = document.createElement('th');
+               th.textContent = header;
+               headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+         
+            const tbody = document.createElement('tbody');
+            tableData.forEach(row => {
+               const tr = document.createElement('tr');
+               Object.values(row).forEach(value => {
+                  const td = document.createElement('td');
+                  td.textContent = value;
+                  tr.appendChild(td);
+               });
+               tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+         
+            tableContainer.appendChild(table);
+            messageContainer.appendChild(tableContainer);
+         
+            if (downloadUrl) {
+               const downloadButton = document.createElement('button');
+               downloadButton.textContent = 'Download Full Data as Excel';
+               downloadButton.style.marginTop = '10px';
+               downloadButton.onclick = () => {
+                  window.location.href = downloadUrl;
+               };
+               messageContainer.appendChild(downloadButton);
+            }
+         
+            chatbox.appendChild(messageContainer);
+            chatbox.scrollTop = chatbox.scrollHeight;
+         }
+      </script>
+   </body>
+</html>
